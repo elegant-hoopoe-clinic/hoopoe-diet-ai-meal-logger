@@ -1,0 +1,20 @@
+services:
+  food-recognition-api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models
+      - ./model_storage:/app/model_storage
+      - ./app:/app/app
+    environment:
+      - MODEL_PATH=/app/models/food_recognizer_model.json
+      - TEMP_UPLOAD_DIR=/app/temp_uploads
+      - MODEL_STORAGE_DIR=/app/model_storage
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
