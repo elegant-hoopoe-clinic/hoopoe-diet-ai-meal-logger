@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: hoopoe-diet-ai-meal-logger
+spec:
+    replicas: 1
+    strategy:
+        rollingUpdate:
+            maxSurge: 1
+            maxUnavailable: 0
+        type: RollingUpdate
+    selector:
+        matchLabels: &labels
+            app: hoopoe-diet-ai-meal-logger
+    template:
+        metadata:
+            labels: *labels
+        spec:
+            containers:
+                - name: hoopoe-diet-ai-meal-logger
+                  image: ghcr.io/elegant-hoopoe-clinic/hoopoe-diet-ai-meal-logger:latest
+                  ports:
+                      - containerPort: 8000
+                  envFrom:
+                      - configMapRef:
+                            name: hoopoe-diet-ai-meal-logger
+                  env:
+                      - name: PROMETHEUS_MULTIPROC_DIR
+                        value: '/prometheus_multiproc_dir'
+#                  command:
+#                      - /bin/bash
+#                  args:
+#                      - -c
+#                      - docker-entrypoint.sh
+                  # readinessProbe:
+                  #   failureThreshold: 5
+                  #   httpGet:
+                  #     path: /health
+                  #     port: 8000
+                  #   initialDelaySeconds: 10
+                  #   periodSeconds: 5
+                  #   successThreshold: 3
+                  #   timeoutSeconds: 10
+                  # livenessProbe:
+                  #   failureThreshold: 5
+                  #   httpGet:
+                  #     path: /health
+                  #     port: 8000
+                  #   initialDelaySeconds: 10
+                  #   periodSeconds: 60
+                  #   timeoutSeconds: 10
+                  resources:
+                      limits:
+                          cpu: 700m
+                          memory: 800Mi
+                      requests:
+                          cpu: 10m
+                          memory: 100Mi
+                  volumeMounts:
+                      - mountPath: /prometheus_multiproc_dir
+                        name: prometheus-multiproc-dir
+            volumes:
+                - emptyDir: {}
+                  name: prometheus-multiproc-dir
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+    name: hoopoe-diet-ai-meal-logger
+    labels:
+        app: hoopoe-diet-ai-meal-logger
+spec:
+    ports:
+        - name: http
+          port: 80
+          targetPort: 8000
+    selector:
+        app: hoopoe-diet-ai-meal-logger
