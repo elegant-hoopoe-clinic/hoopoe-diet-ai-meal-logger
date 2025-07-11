@@ -12,7 +12,7 @@ env:
   REGISTRY: ghcr.io
   # github.repository as <account>/<repo>
   IMAGE_NAME: ${{ github.repository }}
-  APP_ENV: ${{ github.ref == github.ref == 'refs/heads/dev' && 'dev' || github.ref == 'refs/heads/stage' && 'stage' || 'prod' }}
+  APP_ENV: ${{ github.ref == 'refs/heads/dev' && 'dev' || github.ref == 'refs/heads/stage' && 'stage' || 'prod' }}
   PROJECT_TYPE: back
 
 
