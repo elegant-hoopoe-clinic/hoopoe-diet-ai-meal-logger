@@ -2,7 +2,7 @@ name: Docker Image Publish
 
 on:
   push:
-    branches: ['main', 'master', 'stage', 'dev', 'homecare']
+    branches: ['main', 'master', 'stage', 'dev']
     # Publish semver tags as releases.
     tags: [ 'v*.*.*' ]
 
@@ -12,7 +12,7 @@ env:
   REGISTRY: ghcr.io
   # github.repository as <account>/<repo>
   IMAGE_NAME: ${{ github.repository }}
-  APP_ENV: ${{ github.ref == 'refs/heads/homecare' && 'homecare' || github.ref == 'refs/heads/dev' && 'dev' || github.ref == 'refs/heads/stage' && 'stage' || 'prod' }}
+  APP_ENV: ${{ github.ref == github.ref == 'refs/heads/dev' && 'dev' || github.ref == 'refs/heads/stage' && 'stage' || 'prod' }}
   PROJECT_TYPE: back
 
 
@@ -113,9 +113,7 @@ jobs:
           namespace: ${{ env.APP_ENV }}-${{ env.PROJECT_TYPE }}
           strategy: basic
           manifests: |
-            apps/hoopoe_emr/manifests/deployment.yaml
-            apps/hoopoe_diet/manifests/deployment.yaml
-#            apps/socket/manifests/deployment.yaml
+            manifests/deployment.yaml
           images: |
             ${{ needs.build.outputs.app_image }}
 
