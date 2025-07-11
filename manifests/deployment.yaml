@@ -52,10 +52,12 @@ spec:
                   resources:
                       limits:
                           cpu: 700m
-                          memory: 800Mi
+                          memory: 6Gi
+                          ephemeral-storage: 10Gi
                       requests:
-                          cpu: 10m
-                          memory: 100Mi
+                          cpu: 500m
+                          memory: 6Gi
+                          ephemeral-storage: 10Gi
                   volumeMounts:
                       - mountPath: /prometheus_multiproc_dir
                         name: prometheus-multiproc-dir
