@@ -1,0 +1,119 @@
+name: Docker Image Publish
+
+on:
+  push:
+    branches: ['main', 'master', 'stage', 'dev']
+    # Publish semver tags as releases.
+    tags: [ 'v*.*.*' ]
+
+
+env:
+  # Use docker.io for Docker Hub if empty
+  REGISTRY: ghcr.io
+  # github.repository as <account>/<repo>
+  IMAGE_NAME: ${{ github.repository }}
+  APP_ENV: ${{ github.ref == 'refs/heads/dev' && 'dev' || github.ref == 'refs/heads/stage' && 'stage' || 'prod' }}
+  PROJECT_TYPE: back
+
+
+jobs:
+  build:
+    runs-on: hetzner
+    permissions:
+      contents: read
+      packages: write
+      # This is used to complete the identity challenge
+      # with sigstore/fulcio when running outside of PRs.
+      id-token: write
+    outputs:
+      app_image: ${{ steps.meta.outputs.tags }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+
+      # Workaround: https://github.com/docker/build-push-action/issues/461
+      - name: Setup Docker buildx
+        uses: docker/setup-buildx-action@v2
+
+      # Login against a Docker registry except on PR
+      # https://github.com/docker/login-action
+      - name: Log into registry ${{ env.REGISTRY }}
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@28218f9b04b4f3f62068d7b6ce6ca5b26e35336c
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHRC_SECRET }}
+
+      # Extract metadata (tags, labels) for Docker
+      # https://github.com/docker/metadata-action
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value={{date 'YYYYMMDD-HHmmss' tz='Asia/Tehran'}}
+
+      # Build and push Docker image with Buildx (don't push on PR)
+      # https://github.com/docker/build-push-action
+      - name: Build and push Docker image
+        id: build-and-push
+        uses: docker/build-push-action@v4
+        with:
+          context: "{{defaultContext}}:."
+          push: ${{ github.event_name != 'pull_request' }} # Don't push on PR
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+#          cache-from: type=gha
+#          cache-to: type=gha,mode=max
+          build-args: |
+            "ACCESS_TOKEN_HEALTH_BRIDGE=${{ secrets.ACCESS_TOKEN_HEALTH_BRIDGE }}"
+
+  deploy:
+    runs-on: elegant-k8s-elegant-hoopoe-clinic-org-runner
+    permissions:
+      contents: read
+      packages: write
+      # This is used to complete the identity challenge
+      # with sigstore/fulcio when running outside of PRs.
+      id-token: write
+    needs: build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: install kubectl
+        uses: azure/setup-kubectl@v3
+        id: install
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - id: install-aws-cli
+        uses: unfor19/install-aws-cli-action@v1
+        with:
+          version: 2                         # default
+          verbose: false                     # default
+          arch: amd64                        # allowed values: amd64, arm64
+
+      - name: Set Up kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ vars.AWS_EKS_NAME}} --region ${{ vars.AWS_REGION }}
+
+      - name: Deploy to the Kubernetes cluster
+        uses: azure/k8s-deploy@v1
+        with:
+          namespace: ${{ env.APP_ENV }}-${{ env.PROJECT_TYPE }}
+          strategy: basic
+          manifests: |
+            manifests/deployment.yaml
+          images: |
+            ${{ needs.build.outputs.app_image }}
+
